@@ -4,7 +4,7 @@ from datetime import datetime, timedelta,timezone
 from functools import wraps
 from loguru import logger
 
-from app.auth.model import User
+from app.models import User
 
 
 # 临时链接用的token操作
@@ -23,6 +23,8 @@ def generate_jwt_token(user_id, expires_in):
         'exp': datetime.now(timezone.utc) + expires_in,
         'iat': datetime.now(timezone.utc)
     }
+    logger.info(payload['exp'])
+    logger.info(payload['iat'])
 
     token = jwt.encode(payload=payload, key=current_app.config['JWT_SECRET_KEY'], algorithm='HS256')
 
@@ -38,32 +40,41 @@ def verify_token(token):
     payload = jwt.decode(token, current_app.config['JWT_SECRET_KEY'], algorithms=['HS256'])
     return payload['sub']
 
+def get_current_user():
+    try:
+        token = request.headers.get('Authorization', '').replace('Bearer ', '')
+        if not token:
+            return None
+        user_id = verify_token(token)
+        current_user = User.query.get(user_id)
+        if not current_user:
+            return None
+        logger.info(f"User: [{current_user}]")
+        return current_user
+    except jwt.ExpiredSignatureError:
+        logger.info('token过期')
+        return None
+    except jwt.InvalidTokenError:
+        logger.info('token非法')
+        return None
+    except Exception as e:
+        logger.error(str(e))
+        return None
+    
+def token_optional(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        current_user = get_current_user()
+        return f(current_user, *args, **kwargs)
+    return decorated
+
 # token校验装饰器
 def token_required(f):
     @wraps(f)
     def decorated(*args, **kwargs):
-        token = request.headers.get('Authorization', '').replace('Bearer ', '')
-        if not token:
-            return {'err': 'token缺失'}, 401
-        try:
-            user_id = verify_token(token)
-            current_user = User.query.filter_by(id = user_id).first()
-            logger.info(f"User:{current_user.id if current_user else 'guest'}")
-            if not current_user:
-                return {'err': '找不到该用户'}, 400
-        except jwt.ExpiredSignatureError:
-            logger.info('token过期')
-            return {'err': 'token过期'}, 401
-        except jwt.InvalidTokenError:
-            logger.info('token非法')
-            import traceback
-            logger.error(traceback.format_exc())
-            return {'err': 'token非法'}, 401
-        except Exception as e:
-            logger.error(str(e))
-            import traceback
-            logger.error(traceback.format_exc())
-            return {'err': '服务器错误'}, 500
+        current_user = get_current_user()
+        if not current_user:
+            return {'err': '认证信息缺失或无效'}, 401
         
         return f(current_user, *args, **kwargs)
     return decorated

@@ -1,5 +1,4 @@
 import smtplib
-from email.mime.text import MIMEText
 from flask import current_app
 from loguru import logger
 
