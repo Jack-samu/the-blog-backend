@@ -30,8 +30,8 @@ def format_user_profile(user: User):
             'id': user.id,
             'username': user.username,
             'email': user.email,
-            'articleCount': user.articles.filter_by(is_draft=False).count(),
-            'draftCount': user.articles.filter_by(is_draft=True).count(),
+            'articleCount': user.posts.count(),
+            'draftCount': user.posts.count(),
             'avatar': avatar.name if avatar else None,
         }
 
@@ -216,7 +216,7 @@ def refresh_the_token():
                     'username': user.username,
                     'email': user.email,
                     'avatar': avatar.name if avatar else '',
-                    'posts': user.articles.count()
+                    'posts': user.posts.count()
                 },
         }, code=201)
     except ExpiredSignatureError:
@@ -330,7 +330,7 @@ def login():
                     'username': user.username,
                     'email': user.email,
                     'avatar': avatar.name if avatar else '',
-                    'posts': user.articles.count(),
+                    'posts': user.posts.count(),
                 },
             }, code=200)
     except Exception as e:

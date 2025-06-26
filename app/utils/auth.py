@@ -49,7 +49,7 @@ def get_current_user():
         current_user = User.query.get(user_id)
         if not current_user:
             return None
-        logger.info(f"User: [{current_user}]")
+        logger.info(current_user)
         return current_user
     except jwt.ExpiredSignatureError:
         logger.info('token过期')

@@ -2,31 +2,56 @@
 
 基于 Flask 的 RESTful API 服务，提供blog应用的数据存储和业务逻辑处理。
 
-## 核心架构
-```mermaid
-graph LR
-    A[客户端] --> B[Flask应用]
-    B --> C[Mysql]
-```
+## 整体架构
+
+这个Flask后台采用Blueprint模块化设计，分为三个主要模块：
+* `auth.py` - 用户认证与个人资料管理
+  ### 核心功能
+  - 用户注册/登录/登出
+  - 密码重置流程
+  - JWT token刷新
+  - 头像管理
+  - 用户资料获取
+  #### 亮点设计
+    ```
+    密码重置流程采用三阶段验证
+    1. 发送验证码 -> 2. 验证码校验 -> 3. 重置链接
+    ```
+* `article.py` - 文章内容管理
+  ### 核心功能
+  - 文章CRUD
+  - 草稿管理
+  - 分类/标签管理
+  - 文章点赞
+
+* `comment.py` - 评论互动系统
+  #### 核心功能
+  - 多级评论系统
+  - 评论点赞
+  - 评论管理
 
 ## 现有数据结构
 ```mermaid
 erDiagram
-    USER ||--o{ ARTICLE : "1:n"
-    USER ||--o{ COMMENT : "1:n"
-    USER ||--o{ REPLY : "1:n"
-    USER ||--o{ IMAGE : "1:n"
-    USER ||--o{ LIKE : "1:n"
+    User ||--o{ Article : "撰写"
+    User ||--o{ Category : "创建"
+    User ||--o{ Image : "上传"
+    User ||--o{ Comment : "发表"
+    User ||--o{ Reply : "发表"
     
-    ARTICLE ||--o{ COMMENT : "1:n"
-    ARTICLE ||--o{ IMAGE : "1:n"
-    ARTICLE }|--|| CATEGORY : "n:1"
-    ARTICLE }|--|{ TAG : "n:m"
+    Article ||--o{ Category : "归属"
+    Article ||--|| article_tags : "标记"
+    Article ||--|{ Comment : "包含"
+    Article ||--|{ Reply : "包含"
     
-    COMMENT ||--o{ REPLY : "1:n"
-    COMMENT ||--o{ LIKE : "1:n"
+    Comment ||--o{ Article : "属于"
+    Comment ||--|{ Reply : "包含"
     
-    REPLY ||--o{ LIKE : "1:n"
+    Reply ||--o{ Article : "属于"
+    Reply ||--o{ Comment : "属于"
+    Reply ||--|{ Reply : "回复"
+    
+    article_tags ||--o{ Tag : "标签"
 ```
 
 ## 已完成接口
@@ -78,5 +103,53 @@ flask db init
 flask db migrate
 flask db upgrade
 
-flask run --port=8088 --debug
+# 数据库预操作，创建admin和已注销用户
+flask init-db
+
+# 针对用户密码修改的情况
+flask run --host --port=8088 --debug
+```
+
+## 操作流程注
+用户注销流程
+```mermaid
+sequenceDiagram
+    participant Client
+    participant Controller
+    participant User
+    participant Comment
+    participant Reply
+    
+    Client->>Controller: 删除用户请求
+    Controller->>User: delete_user(user_id)
+    User->>Comment: transfer_to_deleted_user
+    User->>Reply: transfer_to_deleted_user
+    Comment->>DB: 批量UPDATE评论
+    Reply->>DB: 批量UPDATE回复
+    User->>DB: DELETE用户
+    Controller-->>Client: 操作结果
+```
+
+token刷新流程
+```mermaid
+sequenceDiagram
+    participant Request1
+    participant Request2
+    participant Interceptor
+    participant AuthStore
+    
+    Request1->>Interceptor: 收到401
+    Interceptor->>AuthStore: 开始刷新(token1)
+    AuthStore-->>Interceptor: 返回刷新Promise
+    
+    Request2->>Interceptor: 收到401
+    Interceptor->>AuthStore: 检测到已有刷新进行
+    Interceptor-->>Request2: 加入等待队列
+    
+    AuthStore->>Backend: 刷新token
+    Backend-->>AuthStore: 返回新token
+    
+    AuthStore->>Interceptor: 刷新完成
+    Interceptor->>Request1: 用新token重试
+    Interceptor->>Request2: 用新token重试
 ```

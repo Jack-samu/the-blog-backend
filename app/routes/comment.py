@@ -5,7 +5,7 @@ from sqlalchemy.orm import joinedload
 
 
 from app.extensions import db
-from app.models import Comment, Reply, Like, Article
+from app.models import Comment, Reply, Like, Post
 from app.utils.util import make_response
 from app.utils.auth import token_required, token_optional
 
@@ -18,7 +18,7 @@ def format_comment(comment: Comment, current_user = None):
     avatar = user.imgs.filter_by(is_avatar=True).first()
     data = {
         'id': comment.id,
-        'article_id': comment.article_id,
+        'post_id': comment.post_id,
         'user': {
             'id': user.id,
             'username': user.username,
@@ -62,7 +62,7 @@ def get_comments(current_user, id):
         # 待前台实现触底加载的功能后再来分页
         stmt = (
             select(Comment)
-             .where(Comment.article_id == id)
+             .where(Comment.post_id == id)
              .order_by(Comment.updated_at.desc())
              .options(
                 joinedload(Comment.user)
@@ -119,11 +119,11 @@ def create_comment_top(current_user):
             return make_response({'err': '评论主体内容不能为空'},code=400)
 
         with db.session.begin_nested():
-            article = Article.query.get(id)
-            if not article:
+            post = Post.query.get(id)
+            if not post:
                 return make_response({'err': '进行评论的文章无法找到'}, 404)
             comment = Comment(
-                article_id = article.id,
+                post_id = post.id,
                 user_id = current_user.id,
                 content = content
             )
@@ -164,6 +164,7 @@ def create_reply(current_user):
                 comment_id = comment.id,
                 user_id = current_user.id,
                 content = content,
+                post_id = comment.post_id,
                 parent_id = parent_id if parent_id else None
             )
             db.session.add(reply)

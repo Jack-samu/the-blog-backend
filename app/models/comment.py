@@ -14,7 +14,7 @@ class Comment(db.Model):
     created_at = db.Column(db.DateTime(timezone=True), server_default=db.func.now())
     updated_at = db.Column(db.DateTime(timezone=True), server_default=db.func.now(), onupdate=db.func.now())
     # 外键
-    article_id = db.Column(db.Integer, db.ForeignKey('article.id', ondelete='CASCADE'), index=True)
+    post_id = db.Column(db.Integer, db.ForeignKey('posts.id', ondelete='CASCADE'), index=True)
     replies = db.relationship('Reply', backref='comment', foreign_keys="[Reply.comment_id]", cascade='all, delete-orphan')
 
     user_id = db.Column(db.String(36), db.ForeignKey('user.id'), nullable=False)
@@ -49,7 +49,7 @@ class Reply(db.Model):
     created_at = db.Column(db.DateTime(timezone=True), server_default=db.func.now())
     updated_at = db.Column(db.DateTime(timezone=True), server_default=db.func.now(), onupdate=db.func.now())
 
-    article_id = db.Column(db.Integer, db.ForeignKey('article.id', ondelete='CASCADE'),  index=True)
+    post_id = db.Column(db.Integer, db.ForeignKey('posts.id', ondelete='CASCADE'),  index=True)
     comment_id = db.Column(db.Integer, db.ForeignKey('comment.id', name='fk_reply_comment', ondelete='CASCADE'), index=True)
     
     user_id = db.Column(db.String(36), db.ForeignKey('user.id'), nullable=False)

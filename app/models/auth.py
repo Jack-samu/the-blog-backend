@@ -22,7 +22,8 @@ class User(db.Model):
     updated_at = db.Column(db.DateTime(timezone=True), server_default=db.func.now(), onupdate=db.func.now())
     
     # 外键，article和imgs级联删除
-    articles = db.relationship('Article', backref='author', lazy='dynamic', cascade='all, delete-orphan')
+    posts = db.relationship('Post', backref='author', lazy='dynamic', cascade='all, delete-orphan')
+    drafts = db.relationship('Draft', backref='author', lazy='dynamic', cascade='all,delete-orphan')
     categories = db.relationship('Category', backref='user', lazy='dynamic', cascade='all,delete-orphan')
     imgs = db.relationship('Image', backref='uploader', lazy='dynamic', cascade='all, delete-orphan')
 

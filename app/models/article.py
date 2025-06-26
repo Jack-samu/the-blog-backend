@@ -6,8 +6,13 @@ from sqlalchemy.orm import validates
 from sqlalchemy import func
 
 
-article_tags = db.Table('article_tags',
-                    db.Column('article_id', db.Integer, db.ForeignKey('article.id'), primary_key=True),
+post_tags = db.Table('post_tags',
+                    db.Column('post_id', db.Integer, db.ForeignKey('posts.id'), primary_key=True),
+                    db.Column('tags_id', db.Integer, db.ForeignKey('tags.id'), primary_key=True),
+)
+
+draft_tags = db.Table('draft_tags',
+                    db.Column('draft_id', db.Integer, db.ForeignKey('drafts.id'), primary_key=True),
                     db.Column('tags_id', db.Integer, db.ForeignKey('tags.id'), primary_key=True),
 )
 
@@ -18,7 +23,8 @@ class Category(db.Model):
     name = db.Column(db.String(20), unique=True, nullable=False)
     # 级联删除
     user_id = db.Column(db.String(36), db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
-    articles = db.relationship('Article', backref='category', lazy='dynamic', cascade='all, delete-orphan')
+    posts = db.relationship('Post', backref='category', lazy='dynamic', cascade='all, delete-orphan')
+    drafts = db.relationship('Draft', backref='category', lazy='dynamic')
     
     @classmethod
     def get_or_create(cls, name, user_id):
@@ -49,6 +55,9 @@ class Tag(db.Model):
     __table_args__ = (
         db.Index('ix_tag_name', 'name'),
     )
+
+    def is_referenced(self):
+        return len(self.posts) > 0 or len(self.drafts) > 0
     
     @classmethod
     def get_or_create(cls, name):
@@ -67,38 +76,24 @@ class Tag(db.Model):
                     cls.name.collate('utf8mb4_0900_ai_ci') == name
                 ).first()
         return instance
-            
+    
 
-class Article(db.Model):
-    __tablename__ = 'article'
+class Draft(db.Model):
+    __tablename__ = 'drafts'
     # 基础信息
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
     title = db.Column(db.String(40), index=True)
     excerpt = db.Column(db.String(200))
     content = db.Column(db.Text)
-    is_draft = db.Column(db.Boolean)
-    views_cnt = db.Column(db.Integer, nullable=False, default=0)
-    like_cnt = db.Column(db.Integer, default=0, server_default='0')
     cover = db.Column(db.String(100), nullable=True)
     # 时间戳
     created_at = db.Column(db.DateTime(timezone=True), server_default=db.func.now(), index=True)
     updated_at = db.Column(db.DateTime(timezone=True), server_default=db.func.now(), onupdate=db.func.now())
 
     user_id = db.Column(db.String(36), db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
-    category_id = db.Column(db.Integer, db.ForeignKey("categories.id", ondelete='CASCADE'), index=True)
-    tags = db.relationship("Tag", secondary=article_tags, backref='articles', lazy='joined')
-    comments = db.relationship('Comment', backref='article', lazy='dynamic', cascade='all, delete-orphan')
-    replies = db.relationship('Reply', backref='article', lazy='dynamic', cascade='all, delete-orphan')
-
-    def __str__(self):
-        return f"{self.title}, {self.author}, {self.created_at.isoformat()}, {self.is_draft}"
-    
-    def get_tags(self):
-        return [tag.name for tag in self.tags]
-    
-    @validates('content')
-    def validate_content(self, key, value):
-        return value.strip()
+    category_id = db.Column(db.Integer, db.ForeignKey("categories.id"), index=True)
+    post_id = db.Column(db.Integer, db.ForeignKey('posts.id', ondelete='SET NULL'))
+    tags = db.relationship("Tag", secondary=draft_tags, backref='drafts', lazy='joined')
     
     def update_from_dict(self, data):
         self.title = data.get('title', self.title)
@@ -109,7 +104,102 @@ class Article(db.Model):
     @classmethod
     def create_from_dict(cls, data, user_id):
         instance = cls(user_id=user_id)
-        for field in {'title', 'content', 'excerpt', 'cover', 'is_draft', 'cover'}:
+        for field in {'title', 'content', 'excerpt', 'cover'}:
+            if field in data:
+                setattr(instance, field, data[field])
+        return instance
+    
+
+    def update_categories_tags(self, new_category=None, new_tags=None):
+        if new_category is not None:
+            self._update_category(new_category)
+
+        if new_tags is not None:
+            self._update_tags(new_tags)
+
+
+    def _update_category(self, new_category):
+        if not new_category:
+            self.category_id = None
+            return
+        
+        # 如果存在
+        if self.category and self.category.name.casefold() == new_category.casefold():
+            return
+        
+        new_category = Category.get_or_create(new_category, self.user_id)
+        self.category = new_category
+
+    def _update_tags(self, new_tag_names):
+        if not new_tag_names:
+            self.tags.clear()
+            return
+        
+        current_tags = {t.name.casefold() for t in self.tags}
+        new_tags_set = {t.casefold() for t in new_tag_names}
+
+        to_remove = [t for t in self.tags if t.name not in new_tags_set]
+        to_add = [Tag.get_or_create(name) for name in new_tag_names
+                  if name not in current_tags]
+
+        for t in to_remove:
+            self.tags.remove(t)
+
+        self.tags.extend(to_add)
+    
+    def to_post(self):
+        post_data = {
+            'title': self.title,
+            'excerpt': self.excerpt,
+            'content': self.content,
+            'cover': self.cover
+        }
+
+        post = self.post
+        if not post:
+            post = Post.create_from_dict(post_data, self.user_id)
+            db.session.add(post)
+        post.category_id = self.category_id
+        post.tags = self.tags
+        db.session.flush()
+        self.post_id = post.id
+            
+
+class Post(db.Model):
+    __tablename__ = 'posts'
+    # 基础信息
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    title = db.Column(db.String(40), index=True)
+    excerpt = db.Column(db.String(200))
+    content = db.Column(db.Text)
+    views_cnt = db.Column(db.Integer, nullable=False, default=0)
+    like_cnt = db.Column(db.Integer, default=0, server_default='0')
+    cover = db.Column(db.String(100), nullable=True)
+    # 时间戳
+    created_at = db.Column(db.DateTime(timezone=True), server_default=db.func.now(), index=True)
+    updated_at = db.Column(db.DateTime(timezone=True), server_default=db.func.now(), onupdate=db.func.now())
+
+    user_id = db.Column(db.String(36), db.ForeignKey('user.id', ondelete='CASCADE'), nullable=False)
+    category_id = db.Column(db.Integer, db.ForeignKey("categories.id", ondelete='CASCADE'), index=True)
+    tags = db.relationship("Tag", secondary=post_tags, backref='posts', lazy='joined')
+    comments = db.relationship('Comment', backref='post', lazy='dynamic', cascade='all, delete-orphan')
+    replies = db.relationship('Reply', backref='post', lazy='dynamic', cascade='all, delete-orphan')
+    draft = db.relationship('Draft', backref='post', lazy='dynamic')
+
+    def __str__(self):
+        return f"{self.title}, {self.author}, {self.created_at.isoformat()}"
+    
+    def get_tags(self):
+        return [tag.name for tag in self.tags]
+    
+    @validates('content')
+    def validate_content(self, key, value):
+        return value.strip()
+
+    @classmethod
+    def create_from_dict(cls, data, user_id):
+        instance = cls(user_id=user_id)
+        for field in {'title', 'content', 'excerpt', 'cover'}:
             if field in data:
                 setattr(instance, field, data[field])
         return instance
