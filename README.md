@@ -1,155 +1,207 @@
-# Blog Backend
+# Flask 博客后台系统架构文档
 
-基于 Flask 的 RESTful API 服务，提供blog应用的数据存储和业务逻辑处理。
+## 系统概述
 
-## 整体架构
+基于 Flask 的 RESTful API 服务，为博客应用提供完整的数据存储和业务逻辑处理能力，支持文章管理、用户认证、评论互动等核心功能。
 
-这个Flask后台采用Blueprint模块化设计，分为三个主要模块：
-* `auth.py` - 用户认证与个人资料管理
-  ### 核心功能
-  - 用户注册/登录/登出
-  - 密码重置流程
-  - JWT token刷新
-  - 头像管理
-  - 用户资料获取
-  #### 亮点设计
-    ```
-    密码重置流程采用三阶段验证
-    1. 发送验证码 -> 2. 验证码校验 -> 3. 重置链接
-    ```
-* `article.py` - 文章内容管理
-  ### 核心功能
-  - 文章CRUD
-  - 草稿管理
-  - 分类/标签管理
-  - 文章点赞
+## 架构设计
 
-* `comment.py` - 评论互动系统
-  #### 核心功能
-  - 多级评论系统
-  - 评论点赞
-  - 评论管理
+### 分层架构
 
-## 现有数据结构
+| 层级 | 模块 | 职责 | 关键组件 |
+|------|------|------|----------|
+| **表示层** | 路由蓝图 | 接收HTTP请求，返回JSON响应 | AuthBlueprint, ArticleBlueprint, CommentBlueprint |
+| **服务层** | 业务服务 | 处理核心业务逻辑 | ArticleService, AuthService |
+| **数据层** | 数据模型 | 数据持久化与访问 | Article, User, Comment, Tag |
+| **核心模块** | 基础组件 | 提供系统基础能力 | Config, Extensions, Hooks |
+
+### 核心模块说明
+
+#### 1. 配置管理 (`config.py`)
+- 多环境支持：开发/测试/生产环境独立配置
+- 敏感信息通过环境变量加载
+- 数据库连接、JWT密钥、邮件服务等全局配置
+
+#### 2. 扩展集成 (`extensions.py`)
+- 统一管理第三方扩展初始化：
+  - Flask-SQLAlchemy (数据库ORM)
+  - Flask-JWT-Extended (认证管理)
+  - Flask-Mail (邮件服务)
+  - Flask-Migrate (数据库迁移)
+
+#### 3. 请求拦截 (`hooks.py`)
+- 认证拦截器：JWT令牌验证
+- 请求日志记录
+- 异常统一处理
+- CORS跨域支持
+
+#### 4. 领域事件 (`events.py`)
+- 关键业务事件发布：
+  - 用户注册成功
+  - 文章发布
+  - 评论被回复
+- 订阅者处理：
+  - 发送验证邮件
+  - 通知用户
+
+## 数据模型设计
+
 ```mermaid
 erDiagram
-    User ||--o{ Article : "撰写"
-    User ||--o{ Category : "创建"
-    User ||--o{ Image : "上传"
-    User ||--o{ Comment : "发表"
-    User ||--o{ Reply : "发表"
+    User ||--o{ Article : "author"
+    User ||--o{ Category : "owns"
+    User ||--o{ Comment : "writes"
     
-    Article ||--o{ Category : "归属"
-    Article ||--|| article_tags : "标记"
-    Article ||--|{ Comment : "包含"
-    Article ||--|{ Reply : "包含"
+    Article ||--|{ Tag : "tags"
+    Article ||--o{ Category : "belongs_to"
+    Article ||--o{ Comment : "has"
     
-    Comment ||--o{ Article : "属于"
-    Comment ||--|{ Reply : "包含"
-    
-    Reply ||--o{ Article : "属于"
-    Reply ||--o{ Comment : "属于"
-    Reply ||--|{ Reply : "回复"
-    
-    article_tags ||--o{ Tag : "标签"
+    Comment ||--o{ Reply : "has_replies"
+    Reply ||--o{ User : "reply_to"
 ```
 
-## 已完成接口
-| 模块       | 端点示例                  | 方法   | 描述                     |
-|------------|---------------------------|--------|--------------------------|
-| 用户认证   | `/auth/login`             | POST   | JWT 令牌签发             |
-| 文章管理   | `/articles/{id}/comments` | GET    | 获取文章评论列表         |
-| 文件上传   | `/upload/image`           | POST   | 头像/封面图上传          |
+## 关键业务流程
 
-目前已实现的功能模块包含用户auth、文章article和评论comment。
+### 文章发布流程
+```mermaid
+sequenceDiagram
+    participant Client
+    participant ArticleAPI
+    participant ArticleService
+    participant DB
+    
+    Client->>ArticleAPI: POST /articles (with draft data)
+    ArticleAPI->>ArticleService: publish(draft_id)
+    ArticleService->>DB: 创建PublishedArticle记录
+    ArticleService->>DB: 删除Draft记录
+    ArticleService->>DB: 更新关联标签
+    DB-->>ArticleService: 操作结果
+    ArticleService-->>ArticleAPI: 发布结果
+    ArticleAPI-->>Client: 201 Created
+```
+
+### 认证流程
+```mermaid
+sequenceDiagram
+    participant Client
+    participant AuthAPI
+    participant AuthService
+    participant DB
+    
+    Client->>AuthAPI: POST /auth/login (credentials)
+    AuthAPI->>AuthService: authenticate(email, password)
+    AuthService->>DB: 验证用户凭证
+    alt 验证成功
+        DB-->>AuthService: 用户数据
+        AuthService->>AuthService: 生成访问令牌
+        AuthService-->>AuthAPI: 令牌+用户数据
+        AuthAPI-->>Client: 200 OK (with tokens)
+    else 验证失败
+        DB-->>AuthService: 错误
+        AuthService-->>AuthAPI: 错误
+        AuthAPI-->>Client: 401 Unauthorized
+    end
+```
 
 ## 部署指南
-```bash
-git clone https://github.com/Jack-samu/the-blog-backend.git
 
-cd the-blog-backend
-# 依赖安装
-pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
-
-# 事先创建对应文件夹
-sudo mkdir /opt/service
-sudo mkdir /opt/service/mysql
-sudo mkdir /opt/service/mysql/conf /opt/service/mysql/logs /opt/service/mysql/data
-
-# 假定已经按照配置可用docker
-sudo docker run -d --restart=unless-stopped \
-  -p 3306:3306 \
-  -p 33060:33060 \
-  -v /opt/service/mysql/conf:/etc/mysql/conf.d \
-  -v /opt/service/mysql/logs:/var/log/mysql \
-  -v /opt/service/mysql/data:/var/lib/mysql \
-  -v $(pwd)/init.sql:/docker-entrypoint-initdb.d/init.sql \
-  --name mysql_service \
-  -e MYSQL_ROOT_PASSWORD=123456 \
-  -e MYSQL_DATABASE=course \
-  -e MYSQL_USER=guest \
-  -e MYSQL_PASSWORD=Guest123@ \
-  mysql:8.0 \
-  --character-set-server=utf8mb4 \
-  --collation-server=utf8mb4_unicode_ci \
-  --default-authentication-plugin=mysql_native_password
-```
-
-各种密钥都是在自定义.env中，只消配上对应邮箱配置和数据库配置即可，不多。
+### 开发环境配置
 
 ```bash
+# 克隆仓库
+git clone https://github.com/your-repo/blog-backend.git
+cd blog-backend
+
+# 安装依赖
+python -m venv venv
+source venv/bin/activate  # Linux/Mac
+pip install -r requirements.txt
+
+# 环境变量配置 (创建.env文件)
+echo "FLASK_ENV=development" >> .env
+echo "DATABASE_URL=mysql://user:pass@localhost/blog" >> .env
+echo "JWT_SECRET_KEY=your-secret-key" >> .env
+
 # 数据库初始化
 flask db init
 flask db migrate
 flask db upgrade
+flask init-db  # 初始化基础数据
 
-# 数据库预操作，创建admin和已注销用户
-flask init-db
-
-# 针对用户密码修改的情况
-flask run --host --port=8088 --debug
+# 启动服务
+flask run --port 8088
 ```
 
-## 操作流程注
-用户注销流程
-```mermaid
-sequenceDiagram
-    participant Client
-    participant Controller
-    participant User
-    participant Comment
-    participant Reply
-    
-    Client->>Controller: 删除用户请求
-    Controller->>User: delete_user(user_id)
-    User->>Comment: transfer_to_deleted_user
-    User->>Reply: transfer_to_deleted_user
-    Comment->>DB: 批量UPDATE评论
-    Reply->>DB: 批量UPDATE回复
-    User->>DB: DELETE用户
-    Controller-->>Client: 操作结果
+### 生产环境部署 (Docker)
+
+```dockerfile
+# Dockerfile 示例
+FROM python:3.9
+
+WORKDIR /app
+COPY . .
+
+RUN pip install -r requirements.txt
+ENV FLASK_ENV=production
+
+CMD ["gunicorn", "-w 4", "-b :8088", "app:create_app()"]
 ```
 
-token刷新流程
-```mermaid
-sequenceDiagram
-    participant Request1
-    participant Request2
-    participant Interceptor
-    participant AuthStore
-    
-    Request1->>Interceptor: 收到401
-    Interceptor->>AuthStore: 开始刷新(token1)
-    AuthStore-->>Interceptor: 返回刷新Promise
-    
-    Request2->>Interceptor: 收到401
-    Interceptor->>AuthStore: 检测到已有刷新进行
-    Interceptor-->>Request2: 加入等待队列
-    
-    AuthStore->>Backend: 刷新token
-    Backend-->>AuthStore: 返回新token
-    
-    AuthStore->>Interceptor: 刷新完成
-    Interceptor->>Request1: 用新token重试
-    Interceptor->>Request2: 用新token重试
+```bash
+# 启动MySQL容器
+docker run -d --name mysql_blog \
+  -e MYSQL_ROOT_PASSWORD=yourpassword \
+  -e MYSQL_DATABASE=blog \
+  -v mysql_data:/var/lib/mysql \
+  -p 3306:3306 \
+  mysql:8.0
+
+# 构建应用镜像
+docker build -t blog-backend .
+
+# 运行应用容器
+docker run -d --name blog_app \
+  --link mysql_blog:mysql \
+  -p 8088:8088 \
+  -e DATABASE_URL=mysql://root:yourpassword@mysql/blog \
+  blog-backend
 ```
+
+## 系统特性
+
+1. **完善的认证体系**
+   - JWT令牌认证
+   - 令牌自动刷新
+   - 权限分级控制
+
+2. **内容管理能力**
+   - 草稿/发布双状态管理
+   - 分类与标签系统
+   - 内容版本控制
+
+3. **高性能设计**
+   - 数据库查询优化
+   - 异步邮件通知
+   - 请求缓存支持
+
+4. **开发者友好**
+   - 清晰的API文档
+   - 完善的日志记录
+   - 单元测试覆盖
+
+## 架构演进路线
+
+1. **短期优化**
+   - 增加Redis缓存层
+   - 实现API限流机制
+   - 完善监控指标
+
+2. **中期规划**
+   - 引入Celery异步任务队列
+   - 支持多租户架构
+   - 增加全文搜索功能
+
+3. **长期愿景**
+   - 微服务化拆分
+   - 实现Serverless部署
+   - 支持国际化和多语言
