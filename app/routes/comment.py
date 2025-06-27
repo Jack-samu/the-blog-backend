@@ -6,8 +6,8 @@ from sqlalchemy.orm import joinedload
 
 from app.extensions import db
 from app.models import Comment, Reply, Like, Post
-from app.utils.util import make_response
-from app.utils.auth import token_required, token_optional
+from app.utils import make_response
+from app.hooks import token_required, token_optional
 
 
 comment_bp = Blueprint('comment', __name__)
@@ -78,7 +78,6 @@ def get_comments(current_user, id):
     except Exception as e:
         import traceback
         logger.error(traceback.format_exc())
-        logger.error(f"评论获取出错：{e}")
         return make_response({'err': '获取评论时服务器出错'}, code=500)
 
 

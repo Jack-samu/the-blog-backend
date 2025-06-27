@@ -1,9 +1,13 @@
-from flask import current_app, Flask
+from flask import current_app, Flask, request
+import click
+from functools import wraps
+
 from app.extensions import db
 from app.models import User
-import click
+from app.utils import get_current_user
 
 
+# hook设置
 def register_hooks(app):
     
     @app.teardown_appcontext
@@ -16,11 +20,18 @@ def register_hooks(app):
     @app.after_request
     def after_request(resp):
         # 缓存预检结果1小时
+        app.logger.info(f"响应：{resp.status}")
         resp.headers['Access-Control-Max-Age'] = 3600  
         resp.headers['Access-Control-Allow-Methods'] = 'GET, POST, DELETE, OPTIONS'
         if 'application/json' in resp.headers['Content-Type']:
             resp.headers['Content-Type'] = 'application/json; charset=utf-8'
         return resp
+    
+    @app.before_request
+    def before_request():
+        app.logger.info(f"请求：{request.method} {request.path}")
+
+    # 后续添上错误统一处理
     
 
 def register_commands(app: Flask):
@@ -36,3 +47,21 @@ def register_commands(app: Flask):
         except Exception as e:
             app.logger.error(f'初始化出错，{str(e)}')
             db.session.rollback()
+    
+def token_optional(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        current_user = get_current_user()
+        return f(current_user, *args, **kwargs)
+    return decorated
+
+# token校验装饰器
+def token_required(f):
+    @wraps(f)
+    def decorated(*args, **kwargs):
+        current_user = get_current_user()
+        if not current_user:
+            return {'err': '认证信息缺失或无效'}, 401
+        
+        return f(current_user, *args, **kwargs)
+    return decorated

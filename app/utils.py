@@ -1,7 +1,9 @@
+import smtplib
 import jwt
-from flask import current_app, request
+from flask import current_app, request, Response
+from json import dumps
+
 from datetime import datetime, timedelta,timezone
-from functools import wraps
 from loguru import logger
 
 from app.models import User
@@ -9,7 +11,6 @@ from app.models import User
 
 # 临时链接用的token操作
 def generate_reset_token(user: User):
-    logger.info(user)
     payload = {
         'id': user.id,
         'exp': datetime.now(timezone.utc) + timedelta(minutes=5)
@@ -23,8 +24,6 @@ def generate_jwt_token(user_id, expires_in):
         'exp': datetime.now(timezone.utc) + expires_in,
         'iat': datetime.now(timezone.utc)
     }
-    logger.info(payload['exp'])
-    logger.info(payload['iat'])
 
     token = jwt.encode(payload=payload, key=current_app.config['JWT_SECRET_KEY'], algorithm='HS256')
 
@@ -60,21 +59,29 @@ def get_current_user():
     except Exception as e:
         logger.error(str(e))
         return None
-    
-def token_optional(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        current_user = get_current_user()
-        return f(current_user, *args, **kwargs)
-    return decorated
 
-# token校验装饰器
-def token_required(f):
-    @wraps(f)
-    def decorated(*args, **kwargs):
-        current_user = get_current_user()
-        if not current_user:
-            return {'err': '认证信息缺失或无效'}, 401
-        
-        return f(current_user, *args, **kwargs)
-    return decorated
+
+def make_response(data, code=None, type='application/json'):
+    resp = Response(dumps(data, ensure_ascii=False),mimetype=type)
+    if code:
+        resp.status_code = code
+    return resp
+
+
+# 发送邮箱验证码
+def send_msg(email, msg):
+    try:
+        # 邮件操作
+        msg = msg
+        msg['Subject'] = '邮箱验证码'
+        msg['From'] = current_app.config['MAIL_USERNAME']
+        msg['To'] = email
+
+        with smtplib.SMTP(current_app.config['MAIL_SERVER'], current_app.config['MAIL_PORT']) as server:
+            server.starttls()
+            server.login(current_app.config['MAIL_USERNAME'], current_app.config['MAIL_PASSWORD'])
+            server.send_message(msg)
+        return True
+    except Exception as e:
+        logger.error(e)
+        return False

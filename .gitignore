@@ -15,3 +15,5 @@ result.bash
 tests
 .env
 .gitsecret
+Dockerfile
+utils_bak

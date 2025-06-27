@@ -1,0 +1,12 @@
+.gitsecret
+.pytest_cache
+.env
+migrations
+tests
+.coverage
+create_data.py
+LICENSE
+Pipfile
+pytest.ini
+report.html
+result.bash

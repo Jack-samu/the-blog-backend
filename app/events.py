@@ -20,7 +20,6 @@ def register_events(app: Flask):
                     # 启用WAL模式
                     cursor.execute('PRAGMA journal_mode=WAL')
                     cursor.close()
-                    app.logger.info('执行了')
         
         @event.listens_for(Image, 'after_delete')
         def delete_img_file(mapper, connection, target):
@@ -29,7 +28,6 @@ def register_events(app: Flask):
                 p = f"static/images/{target.name}"
                 if path.exists(p):
                     remove(p)
-                    app.logger.info(f"图片文件已删除，{p}")
                 else:
                     app.logger.info(f"图片路径不存在，检查{p}路径")
             except Exception as e:

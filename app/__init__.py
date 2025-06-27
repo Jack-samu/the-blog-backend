@@ -1,10 +1,9 @@
 from flask import Flask
-from flask_cors import CORS
 from os.path import abspath, dirname, join
 
 
 from .config import Config
-from .extensions import db, migrate
+from .extensions import db, migrate, cors
 from .hooks import register_hooks, register_commands
 from .events import register_events
 
@@ -20,10 +19,7 @@ def create_app(name='blog-app', config = Config):
         name, 
         static_folder=staticP
     )
-    CORS(
-        app, 
-        supports_credentials=True
-    )
+    
     app.config.from_object(config)
     app.config['UPLOAD_FOLDER'] = join(staticP, 'images')
     app.config['JSON_AS_ASCII'] = False
@@ -33,6 +29,7 @@ def create_app(name='blog-app', config = Config):
     # 初始化扩展
     db.init_app(app)
     migrate.init_app(app, db)
+    cors.init_app(app, supports_credentials=True)
     register_hooks(app)
     register_events(app)
     register_commands(app)

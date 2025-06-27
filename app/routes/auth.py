@@ -1,4 +1,4 @@
-from flask import Blueprint, request, current_app, Response
+from flask import Blueprint, request, current_app, Response, url_for
 
 from datetime import datetime
 from random import choice
@@ -11,9 +11,8 @@ from jwt import ExpiredSignatureError, InvalidTokenError, decode
 
 
 from app.extensions import db
-from app.utils.auth import generate_reset_token, token_required, generate_jwt_token, generate_refresh_token, verify_token
-from app.utils.emails import send_msg
-from app.utils.util import make_response
+from app.utils import generate_reset_token, generate_jwt_token, generate_refresh_token, verify_token, send_msg, make_response
+from app.hooks import token_required
 from app.models import Image, User
 
 
@@ -97,7 +96,8 @@ def verify():
     user = User.query.filter_by(username=username, email=email).first()
     token = generate_reset_token(user)
     uuid = str(uuid4())
-    resset_link = f'http://192.168.1.10:8088/auth/reset/{token}/{uuid}'
+    resset_link = url_for('auth.reset', token=token, uuid=uuid)
+    # resset_link = f'http://192.168.1.10:8088/auth/reset/{token}/{uuid}'
     msg = MIMEText(f'{username}，你好，请点击以下链接进行密码重设：{resset_link}，有效期为5分钟')
 
     if send_msg(email, msg):
@@ -159,7 +159,6 @@ def reset(token, uuid):
         # 事务回滚，防止注册出错都进行存储
         import traceback
         logger.error(traceback.format_exc())
-        logger.error(e)
         db.session.rollback()
         return make_response({'err': '服务器错误，注册失败'}, code=500)
     
@@ -271,7 +270,6 @@ def register():
         # 事务回滚，防止注册出错都进行存储
         import traceback
         logger.error(traceback.format_exc())
-        logger.error(e)
         db.session.rollback()
         return make_response({'err': '服务器错误，注册失败'}, code=500)
 
@@ -318,9 +316,7 @@ def login():
             db.session.commit()
             return make_response({'err': '密码错误'}, code=400)
         access_token = generate_jwt_token(user.id, current_app.config['JWT_ACCESS_EXPIRES'])
-        logger.info(f'生成的token：{access_token}')
         refresh_token = generate_refresh_token(user.id, current_app.config['JWT_REFRESH_EXPIRES'])
-        logger.info(f'生成的refreshToken：{refresh_token}')
         avatar = user.imgs.filter_by(is_avatar=True).first()
         return make_response({
             'token': access_token, 
@@ -336,7 +332,6 @@ def login():
     except Exception as e:
         import traceback
         logger.error(traceback.format_exc())
-        logger.error(e)
         return make_response({'err': '服务器错误'}, code=500)
     
 

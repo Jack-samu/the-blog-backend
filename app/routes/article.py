@@ -1,11 +1,10 @@
 from flask import Blueprint, request
-from urllib.parse import unquote
 from loguru import logger
 
 
 from app.extensions import db
-from app.utils.auth import token_required
-from app.utils.util import make_response
+from app.hooks import token_required
+from app.utils import make_response
 from app.models import Post, Draft, Category, Like
 
 from app.services.article_services import ArticleSerializer
@@ -13,11 +12,6 @@ from app.services.article_services import ArticleSerializer
 
 
 article_bp = Blueprint('article', __name__)
-
-
-@article_bp.before_request
-def log_request():
-    logger.info(f"[{request.method}] {request.path}")
 
 
 # 展示文章和对应
@@ -46,7 +40,6 @@ def articles():
     except Exception as e:
         import traceback
         logger.error(traceback.format_exc())
-        logger.error(e)
         return make_response({'err': '服务器错误，获取所有文章出错'}, code=500)
 
 
