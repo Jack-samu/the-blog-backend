@@ -78,6 +78,8 @@ jobs:
       if: failure()  # 仅在失败时启动
       uses: mxschmitt/action-tmate@v3
       timeout-minutes: 30  # 会话最长持续时间
+      with:
+        web: true
 
     - name: Generate test summary
       id: test-summary
