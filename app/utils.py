@@ -47,6 +47,7 @@ def get_current_user():
         user_id = verify_token(token)
         current_user = User.query.get(user_id)
         if not current_user:
+            logger.error(user_id)
             return None
         logger.info(current_user)
         return current_user

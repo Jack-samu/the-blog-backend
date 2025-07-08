@@ -135,13 +135,13 @@ def get_drafts_personal(current_user):
     
 
 # 后续可以加上页面导航
-@article_bp.route('/articles/series', methods=['GET'])
+@article_bp.route('/articles/series/<string:id>', methods=['GET'])
 @token_required
-def get_series(current_user):
+def get_series(current_user, id):
     try:
 
         categories = Category.query.filter_by(
-            user_id=current_user.id
+            user_id=id
         ).all()
 
         return make_response({

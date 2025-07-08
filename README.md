@@ -108,12 +108,12 @@ cd the-blog-backend
 # 安装依赖
 sudo pip3 install pipenv
 pipenv install
-pip install -r requirements.txt
+pip install -r requirements.txt -i https://pypi.tuna.tsinghua.edu.cn/simple
 
 # mysql容器服务配置
 sudo docker run -d --restart=unless-stopped \
   -p 3306:3306 \
-  -v $(pwd)/init.sql:/docker-entrypoint-initdb.d/init.sql \
+  -v $(pwd)/db/init.sql:/docker-entrypoint-initdb.d/init.sql \
   --name mysql_service \
   -e MYSQL_ROOT_PASSWORD=123456 \
   -e TZ=Asia/Shanghai \
@@ -137,7 +137,7 @@ flask db migrate
 flask db upgrade
 
 # 初始化一些数据进去
-sudo docker exec -it mysql_service mysql -u root -p123456 course < blog_data.sql
+sudo docker exec -it mysql_service mysql -u root -p123456 course < db/blog_data.sql
 
 # 启动服务，密码重置链接会有局域网下外部主机访问需要，如果你用手机访问的话
 flask run --host 0.0.0.0 --port 8088
@@ -185,7 +185,7 @@ COPY . .
 RUN flask db init
 RUN flask db migrate
 RUN flask db upgrade
-RUN mysql -hmysql_service -p 3306 -uroot -p123456 course < blog_data.sql
+RUN mysql -hmysql_service -p 3306 -uroot -p123456 course < db/blog_data.sql
 
 EXPOSE 8088
 CMD ["flask", "run", "--host", "0.0.0.0", "--port", "8088"]
@@ -196,7 +196,7 @@ CMD ["flask", "run", "--host", "0.0.0.0", "--port", "8088"]
 # 在build这个backend镜像之前先准备好mysql服务
 sudo docker run -d --restart=unless-stopped \
   -p 3306:3306 \
-  -v $(pwd)/init.sql:/docker-entrypoint-initdb.d/init.sql \
+  -v $(pwd)/db/init.sql:/docker-entrypoint-initdb.d/init.sql \
   --name mysql_service \
   -e MYSQL_ROOT_PASSWORD=123456 \
   -e TZ=Asia/Shanghai \

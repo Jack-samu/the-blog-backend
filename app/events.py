@@ -1,6 +1,6 @@
 from sqlalchemy import event
 from sqlalchemy.orm import object_session
-from flask import Flask
+from flask import Flask, current_app
 
 from app.extensions import db
 from app.models import Image, Post, Draft
@@ -29,7 +29,7 @@ def register_events(app: Flask):
                 if path.exists(p):
                     remove(p)
                 else:
-                    app.logger.info(f"图片路径不存在，检查{p}路径")
+                    current_app.logger.warn(f"图片路径不存在，检查{p}路径")
             except Exception as e:
                 app.logger.error(f"图片删除出错，{str(e)}")
 

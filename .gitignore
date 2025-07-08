@@ -12,7 +12,6 @@ report.html
 result.bash
 .gitsecret/keys/random_seed
 !*.secret
-tests
 .env
 .gitsecret
 Dockerfile

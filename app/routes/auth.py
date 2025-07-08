@@ -20,7 +20,7 @@ auth_bp = Blueprint('auth', __name__)
 
 verification_codes = {}
 def allowed_img(filename):
-    return '.' in filename and filename.rsplit('.', 1)[1].lower() in {'png', 'jpg', 'jpeg', 'gif'}
+    return '/' in filename and filename.rsplit('/', 1)[1].lower() in {'png', 'jpg', 'jpeg', 'gif'}
 
 
 def format_user_profile(user: User):
@@ -96,7 +96,7 @@ def verify():
     user = User.query.filter_by(username=username, email=email).first()
     token = generate_reset_token(user)
     uuid = str(uuid4())
-    resset_link = url_for('auth.reset', token=token, uuid=uuid)
+    resset_link = url_for('auth.reset', token=token, uuid=uuid, _external=True)
     # resset_link = f'http://192.168.1.10:8088/auth/reset/{token}/{uuid}'
     msg = MIMEText(f'{username}，你好，请点击以下链接进行密码重设：{resset_link}，有效期为5分钟')
 
@@ -163,8 +163,37 @@ def reset(token, uuid):
         return make_response({'err': '服务器错误，注册失败'}, code=500)
     
 
+@auth_bp.route('/auth/resetpwd', methods=['POST'])
+@token_required
+def reset_pwd(current_user):
+    try:
+        form = request.get_json()
+        pwd = form.get('pwd')
+        if not pwd:
+            return make_response({'err': '重设密码，你的新密码呢？'}, code=403)
+        
+        pwdConfirm = form.get('pwdConfirm')
+        if not pwdConfirm:
+            return make_response({'err': '表单缺失，密码确定丢了'}, code=403)
+        if pwd != pwdConfirm:
+            return make_response({'err': '前后不一致'}, code=403)
+        
+        if current_user.check_pwd(pwd):
+            return make_response({'err': '恭喜你，猜对了原密码'}, code=403)
+        
+        current_user.set_pwd(pwd)
+        db.session.commit()
+        return make_response({'msg': '密码修改成功'}, code=201)
+    
+    except Exception as e:
+        logger.error(str(e))
+        db.session.rollback()
+        return make_response({'err': '服务器错误'}, code=500)
+    
+
 @auth_bp.route('/auth/<string:id>/profile', methods=['GET'])
-def profile(id):
+@token_required
+def profile(current_user, id):
     try:
         user = User.query.get(id)
         return make_response({
@@ -178,7 +207,8 @@ def profile(id):
 
 
 @auth_bp.route('/auth/<string:id>/photos', methods=['GET'])
-def get_photos(id):
+@token_required
+def get_photos(current_user, id):
     try:
         photos = Image.query.filter_by(user_id=id).all()
         return make_response({
@@ -240,6 +270,7 @@ def register():
         username = form.get('username')
         password = form.get('password')
         email = form.get('email')
+        bio = form.get('bio')
 
         # 针对非前台表单
         if not all([username, password, email]):
@@ -254,7 +285,7 @@ def register():
             return make_response({'err': '注册邮箱已存在'}, code=400)
 
         with db.session.begin_nested():
-            new_user = User(username=username, email=email)
+            new_user = User(username=username, email=email, bio=bio)
             new_user.set_pwd(password)
             db.session.add(new_user)
             db.session.flush()
@@ -265,7 +296,7 @@ def register():
                 db.session.add(img)
         db.session.commit()
 
-        return make_response({'msg': '注册成功'}, code=200)
+        return make_response({'msg': '注册成功'}, code=201)
     except Exception as e:
         # 事务回滚，防止注册出错都进行存储
         import traceback
@@ -282,9 +313,9 @@ def set_avatar(current_user):
             return make_response({'err': 'image part not found.'}, code=400)
         
         file = request.files['file']
-        if not allowed_img(file.filename):
+        if not allowed_img(file.mimetype):
             return make_response({'err': '仅支持PNG/JPG/JPEG/GIF格式'}, code=400)
-        ext = file.filename.rsplit('.', 1)[1].lower()
+        ext = file.mimetype.rsplit('/', 1)[1].lower()
         filename = f"{uuid4().hex}.{ext}"
         file.save(join(current_app.config['UPLOAD_FOLDER'], filename))
 
@@ -355,9 +386,9 @@ def save_img():
             return make_response({'err': 'image part not found.'}, code=400)
         
         file = request.files['image']
-        if not allowed_img(file.filename):
+        if not allowed_img(file.mimetype):
             return make_response({'err': '仅支持PNG/JPG/JPEG/GIF格式'}, code=400)
-        ext = file.filename.rsplit('.', 1)[1].lower()
+        ext = file.mimetype.rsplit('/', 1)[1].lower()
         filename = f"{uuid4().hex}.{ext}"
         file.save(join(current_app.config['UPLOAD_FOLDER'], filename))
 
@@ -400,9 +431,9 @@ def upload_img(current_user):
             return make_response({'err': 'image part not found.'}, code=400)
         
         file = request.files['image']
-        if not allowed_img(file.filename):
+        if not allowed_img(file.mimetype):
             return make_response({'err': '仅支持PNG/JPG/JPEG/GIF格式'}, code=400)
-        ext = file.filename.rsplit('.', 1)[1].lower()
+        ext = file.mimetype.rsplit('/', 1)[1].lower()
         filename = f"{uuid4().hex}.{ext}"
         file.save(join(current_app.config['UPLOAD_FOLDER'], filename))
 

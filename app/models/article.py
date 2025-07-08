@@ -82,7 +82,7 @@ class Draft(db.Model):
     __tablename__ = 'drafts'
     # 基础信息
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    title = db.Column(db.String(40), index=True)
+    title = db.Column(db.String(100), index=True)
     excerpt = db.Column(db.String(200))
     content = db.Column(db.Text)
     cover = db.Column(db.String(100), nullable=True)
@@ -94,6 +94,9 @@ class Draft(db.Model):
     category_id = db.Column(db.Integer, db.ForeignKey("categories.id"), index=True)
     post_id = db.Column(db.Integer, db.ForeignKey('posts.id', ondelete='SET NULL'))
     tags = db.relationship("Tag", secondary=draft_tags, backref='drafts', lazy='joined')
+
+    def __str__(self):
+        return f"[{self.id}, {self.title}]"
     
     def update_from_dict(self, data):
         self.title = data.get('title', self.title)
@@ -169,7 +172,7 @@ class Post(db.Model):
     __tablename__ = 'posts'
     # 基础信息
     id = db.Column(db.Integer, primary_key=True, autoincrement=True)
-    title = db.Column(db.String(40), index=True)
+    title = db.Column(db.String(100), index=True)
     excerpt = db.Column(db.String(200))
     content = db.Column(db.Text)
     views_cnt = db.Column(db.Integer, nullable=False, default=0)

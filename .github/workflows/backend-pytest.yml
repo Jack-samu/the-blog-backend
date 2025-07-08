@@ -1,0 +1,101 @@
+name: Python Backend test
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  backend-test:
+    runs-on: ubuntu-latest
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: course
+          MYSQL_USER: guest
+          MYSQL_PASSWORD: Guest123@
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd "mysqladmin ping -proot"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 3
+    
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+
+    # mysql数据初始化检查
+    - name: Verify Mysql initialization
+      run: |
+        for i in {1..10};do
+          if mysql -h 127.0.0.1 -P 3306 -u root -proot -e "SELECT 1" >/dev/null 2>&1; then
+            echo "Mysql is ready"
+            exit 0
+          fi
+          sleep 2
+        done
+        echo "Mysql failed to start"
+        exit 1
+
+    # pytest正式测试
+    - name: Run tests with pytest
+      env:
+        DATABASE_URI: mysql+pymysql://guest:Guest123%40@localhost:3306/course?charset=utf8mb4&connect_timeout=20
+      run: |
+        pytest tests/ --cov=app --cov-report=html --timeout=40 \
+        || echo "::set-output name=test_result::failure"
+
+    # 覆盖率
+    - name: Upload coverage
+      uses: codecov/codecov-action@v3
+
+    - name: Generate test summary
+      id: test-summary
+      run: |
+        echo "::set-output name=passed::$(grep -o 'tests.*passed' .coverage_output | wc -l)"
+        echo "::set-output name=failed::$(grep -o 'tests.*failed' .coverage_output | wc -l)"
+    
+    # 结果通知
+    - name: Email notification
+      if: always()
+      uses: dawidd6/action-send-mail@v3
+      with:
+        server_address: smtp.163.com
+        server_port: 25
+        username: ${{ secrets.MAIL_USERNAME }}
+        password: ${{ secrets.MAIL_PASSWORD }}
+        subject: "Github CICD backend test results (${{ job.status }}): ${{github.respository}}"
+        to: ${{ secrets.NOTIFICATION_EMAIL }}
+        body: |
+          📊 Test Results
+          ===============
+          Repository: ${{ github.repository }}
+          Branch: ${{ github.ref }}
+          Status: ${{ job.status }}
+          
+          📌 Test Summary:
+          - Passed: ${{ steps.test-summary.outputs.passed }}
+          - Failed: ${{ steps.test-summary.outputs.failed }}
+          - Coverage: $(grep -o 'line-rate="[0-9.]*"' coverage.xml | cut -d'"' -f2)
+          
+          🔍 Details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        html_body: |
+          <h1>📊 Test Results</h1>
+          <p><strong>Status:</strong> ${{ job.status }}</p>
+          <pre>$(grep -E '(errors|failures)=' test-results.xml | sed 's/.*\(errors\|failures\)="\([0-9]*\)".*/\1: \2/')</pre>
+          <a href="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}">View Full Report</a>
