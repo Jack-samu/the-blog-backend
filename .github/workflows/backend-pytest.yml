@@ -74,12 +74,10 @@ jobs:
           --cov-report=html
         echo "test_result=$(if [ $? -eq 0 ]; then echo 'success'; else echo 'failure'; fi)" >> $GITHUB_OUTPUT
 
-    - name: Setup tmate
-      if: failure()
+    - name: Setup tmate debug session
+      if: failure()  # 仅在失败时启动
       uses: mxschmitt/action-tmate@v3
-      with:
-        limit-access-to-actor: true
-        timeout: 10m
+      timeout-minutes: 30  # 会话最长持续时间
 
     - name: Generate test summary
       id: test-summary
