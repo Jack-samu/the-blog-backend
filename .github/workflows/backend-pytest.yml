@@ -104,6 +104,7 @@ jobs:
         username: ${{ secrets.MAIL_USERNAME }}
         password: ${{ secrets.MAIL_PASSWORD }}
         subject: "Github CICD backend test results (${{ job.status }}): ${{github.respository}}"
+        from: "Github Actions Bot <pentajack@163.com>"
         to: ${{ secrets.NOTIFICATION_EMAIL }}
         body: |
           📊 Test Results
