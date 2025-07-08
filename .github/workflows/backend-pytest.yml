@@ -38,6 +38,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         pip install -r requirements.txt
+        sudo apt-get install -y default-libmysqlclient-dev
 
     # mysql数据初始化检查
     - name: Verify Mysql initialization
@@ -61,18 +62,26 @@ jobs:
         MAIL_PORT: ${{secrets.MAIL_PORT}}
         DATABASE_URI: mysql+pymysql://guest:Guest123%40@localhost:3306/course?charset=utf8mb4&connect_timeout=20
       run: |
-        pytest tests/ --cov=app --cov-report=html --timeout=40 \
-        || echo "::set-output name=test_result::failure"
-
-    # 覆盖率
-    - name: Upload coverage
-      uses: codecov/codecov-action@v3
+        pytest tests/ \
+          --cov=app \
+          --cov-branch \
+          --cov-report=xml \
+          --junitxml=test-results.xml \
+          --cov-report=html
+        echo "test_result=$(if [ $? -eq 0 ]; then echo 'success'; else echo 'failure'; fi)" >> $GITHUB_OUTPUT
 
     - name: Generate test summary
       id: test-summary
       run: |
-        echo "::set-output name=passed::$(grep -o 'tests.*passed' .coverage_output | wc -l)"
-        echo "::set-output name=failed::$(grep -o 'tests.*failed' .coverage_output | wc -l)"
+        passed=$(xmlstarlet sel -t -v "//@tests" -v "//@failures" test-results.xml | awk '{print $1-$2}')
+        failed=$(xmlstarlet sel -t -v "//@failures" test-results.xml)
+        echo "passed=$passed" >> $GITHUB_OUTPUT
+        echo "failed=$failed" >> $GITHUB_OUTPUT
+
+    - name: Upload coverage reports to Codecov
+      uses: codecov/codecov-action@v5
+      with:
+        token: ${{ secrets.CODECOV_TOKEN }}
     
     # 结果通知
     - name: Email notification
