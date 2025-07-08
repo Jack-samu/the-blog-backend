@@ -39,10 +39,6 @@ jobs:
         python -m pip install --upgrade pip
         pip install -r requirements.txt
         sudo apt-get install -y default-libmysqlclient-dev xmlstarlet
-    
-    - name: List installed package
-      run: |
-        pip list
 
     # mysql数据初始化检查
     - name: Verify Mysql initialization
@@ -73,13 +69,6 @@ jobs:
           --junitxml=test-results.xml \
           --cov-report=html
         echo "test_result=$(if [ $? -eq 0 ]; then echo 'success'; else echo 'failure'; fi)" >> $GITHUB_OUTPUT
-
-    - name: Setup tmate debug session
-      if: failure()  # 仅在失败时启动
-      uses: mxschmitt/action-tmate@v3
-      timeout-minutes: 30  # 会话最长持续时间
-      with:
-        web: true
 
     - name: Generate test summary
       id: test-summary
