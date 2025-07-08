@@ -55,6 +55,10 @@ jobs:
     # pytest正式测试
     - name: Run tests with pytest
       env:
+        MAIL_SERVER:  'smtp.163.com'
+        MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
+        MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
+        MAIL_PORT: ${{secrets.MAIL_PORT}}
         DATABASE_URI: mysql+pymysql://guest:Guest123%40@localhost:3306/course?charset=utf8mb4&connect_timeout=20
       run: |
         pytest tests/ --cov=app --cov-report=html --timeout=40 \
