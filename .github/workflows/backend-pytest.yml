@@ -73,10 +73,19 @@ jobs:
     - name: Generate test summary
       id: test-summary
       run: |
+        rate=$(grep -o 'line-rate="[0-9.]*"' coverage.xml | cut -d'"' -f2)
         passed=$(xmlstarlet sel -t -v "//@tests" -v "//@failures" test-results.xml | awk '{print $1-$2}')
         failed=$(xmlstarlet sel -t -v "//@failures" test-results.xml)
+
         echo "passed=$passed" >> $GITHUB_OUTPUT
         echo "failed=$failed" >> $GITHUB_OUTPUT
+        echo "rate=$rate" >> $GITHUB_OUTPUT
+
+    - name: Extract coverage percentage
+      id: coverage
+      run: |
+        percentage=$(grep -o 'line-rate="[0-9.]*"' coverage.xml | cut -d'"' -f2)
+        echo "percentage=$percentage%" >> $GITHUB_OUTPUT
 
     - name: Upload coverage reports to Codecov
       uses: codecov/codecov-action@v5
@@ -105,11 +114,17 @@ jobs:
           📌 Test Summary:
           - Passed: ${{ steps.test-summary.outputs.passed }}
           - Failed: ${{ steps.test-summary.outputs.failed }}
-          - Coverage: $(grep -o 'line-rate="[0-9.]*"' coverage.xml | cut -d'"' -f2)
+          - Coverage: ${{ steps.test-summary.outputs.rate }}
           
           🔍 Details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         html_body: |
           <h1>📊 Test Results</h1>
+          <h2>${{ github.repository }} (${{ github.ref }})</h2>
           <p><strong>Status:</strong> ${{ job.status }}</p>
-          <pre>$(grep -E '(errors|failures)=' test-results.xml | sed 's/.*\(errors\|failures\)="\([0-9]*\)".*/\1: \2/')</pre>
+          <h3>Test Summary</h3>
+          <ul>
+            <li>Passed: ${{ steps.test-summary.outputs.passed }}</li>
+            <li>Failed: ${{ steps.test-summary.outputs.failed }}</li>
+            <li>Coverage: ${{ steps.coverage.outputs.rate }}%</li>
+          </ul>
           <a href="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}">View Full Report</a>
