@@ -77,13 +77,7 @@ jobs:
         failed=$(xmlstarlet sel -t -v "//@failures" test-results.xml)
 
         echo "passed=$passed" >> $GITHUB_OUTPUT
-        echo "failed=$failed" >> $GITHUB_OUTPUT\
-
-    - name: Extract coverage percentage
-      id: coverage
-      run: |
-        percentage=$(grep -o 'line-rate="[0-9.]*"' coverage.xml | cut -d'"' -f2)
-        echo "percentage=$percentage%" >> $GITHUB_OUTPUT
+        echo "failed=$failed" >> $GITHUB_OUTPUT
 
     - name: Upload coverage reports to Codecov
       uses: codecov/codecov-action@v5
