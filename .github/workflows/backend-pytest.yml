@@ -73,32 +73,11 @@ jobs:
     - name: Generate test summary
       id: test-summary
       run: |
-        # 确保文件存在
-        if [ ! -f "coverage.xml" ]; then
-          echo "coverage.xml not found!"
-          exit 1
-        fi
-        if [ ! -f "test-results.xml" ]; then
-          echo "test-results.xml not found!"
-          exit 1
-        fi
+        passed=$(xmlstarlet sel -t -v "//@tests" -v "//@failures" test-results.xml | awk '{print $1-$2}')
+        failed=$(xmlstarlet sel -t -v "//@failures" test-results.xml)
 
-        # 提取数据
-        rate=$(grep -o 'line-rate="[0-9.]*"' coverage.xml | cut -d'"' -f2 || echo "0")
-        passed=$(xmlstarlet sel -t -v "//@tests" -n -v "//@failures" -n test-results.xml 2>/dev/null | awk 'NR==1{t=$1} NR==2{f=$1; print t-f}' || echo "0")
-        failed=$(xmlstarlet sel -t -v "//@failures" test-results.xml 2>/dev/null || echo "0")
-
-        # 调试输出
-        echo "Debug - rate: $rate"
-        echo "Debug - passed: $passed"
-        echo "Debug - failed: $failed"
-
-        # 正确设置输出
-        {
-          echo "passed=$passed"
-          echo "failed=$failed"
-          echo "rate=$rate"
-        } >> $GITHUB_OUTPUT
+        echo "passed=$passed" >> $GITHUB_OUTPUT
+        echo "failed=$failed" >> $GITHUB_OUTPUT\
 
     - name: Extract coverage percentage
       id: coverage
@@ -133,7 +112,6 @@ jobs:
           📌 Test Summary:
           - Passed: ${{ steps.test-summary.outputs.passed }}
           - Failed: ${{ steps.test-summary.outputs.failed }}
-          - Coverage: ${{ steps.test-summary.outputs.rate }}
           
           🔍 Details: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         html_body: |
@@ -144,6 +122,5 @@ jobs:
           <ul>
             <li>Passed: ${{ steps.test-summary.outputs.passed }}</li>
             <li>Failed: ${{ steps.test-summary.outputs.failed }}</li>
-            <li>Coverage: ${{ steps.coverage.outputs.rate }}%</li>
           </ul>
           <a href="${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}">View Full Report</a>
