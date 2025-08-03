@@ -1,0 +1,3 @@
+[submodule "vendor/flask-monitoring-kit"]
+	path = vendor/flask-monitoring-kit
+	url = https://github.com/Jack-samu/flask-monitoring-kit
