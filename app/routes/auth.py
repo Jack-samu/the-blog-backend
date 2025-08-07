@@ -11,14 +11,15 @@ from jwt import ExpiredSignatureError, InvalidTokenError, decode
 
 
 from app.extensions import db
-from app.utils import generate_reset_token, generate_jwt_token, generate_refresh_token, verify_token, send_msg, make_response
+from app.utils import generate_reset_token, generate_jwt_token, generate_refresh_token, verify_token, send_msg, make_response, SafeDict
 from app.hooks import token_required
 from app.models import Image, User
 
 
 auth_bp = Blueprint('auth', __name__)
 
-verification_codes = {}
+verification_codes = SafeDict()
+
 def allowed_img(filename):
     return '/' in filename and filename.rsplit('/', 1)[1].lower() in {'png', 'jpg', 'jpeg', 'gif'}
 
@@ -57,11 +58,12 @@ def send():
         from string import ascii_letters, digits
         chs = ascii_letters + digits
         code = ''.join(choice(chs) for _ in range(6))
-        verification_codes[username] = {
+        verification_codes.set(username, {
             'code': code,
             'email': email,
             'sent_at': datetime.now(),
-        }
+        })
+        logger.info(msg)
         msg = MIMEText(f'{username}，你好，你的验证码为：{code}，有效期为3分钟')
         if send_msg(email, msg):
             return make_response({'msg': '验证码已发送'}, code=200)
@@ -73,7 +75,6 @@ def send():
         return make_response({'err': '验证码发送失败，请重试'}, code=500)
         
 
-
 @auth_bp.route('/auth/verify', methods=['POST'])
 def verify():
     form = request.get_json()
@@ -81,18 +82,20 @@ def verify():
     code = form.get('verificationCode')
 
     # 邮箱验证码校验
+    logger.info(form)
     msg = verification_codes.get(username)
+    logger.info(msg)
     if not msg:
         return make_response({'err': '服务器错误，请重试'}, code=500)
     # 超过5分钟了
     if (datetime.now() - msg['sent_at']).total_seconds() > 60 * 3:
-        del verification_codes[username]
+        del verification_codes.get[username]
         return make_response({'err': '验证码已过期，请重新发送验证码'}, code=400)
     if msg['code'] != code:
         return make_response({'err': '验证码错误，请检查'}, code=400)
     
     # 身份校验通过
-    email = verification_codes[username]['email']
+    email = verification_codes.get(username)['email']
     user = User.query.filter_by(username=username, email=email).first()
     token = generate_reset_token(user)
     uuid = str(uuid4())
@@ -225,7 +228,6 @@ def get_photos(current_user, id):
 
 
 
-# 刷新token，反复debug貌似会有点问题
 @auth_bp.route('/auth/refresh', methods=['POST'])
 def refresh_the_token():
     try:
@@ -258,6 +260,25 @@ def refresh_the_token():
         return make_response({'err': '刷新token不合法'}, code=400)
     except Exception as e:
         return make_response({'err': '服务器出错'}, code=500)
+
+
+@auth_bp.route('/upload-img', methods=['POST'])
+def save_img():
+    try:
+        if 'image' not in request.files:
+            return make_response({'err': 'image part not found.'}, code=400)
+        
+        file = request.files['image']
+        if not allowed_img(file.mimetype):
+            return make_response({'err': '仅支持PNG/JPG/JPEG/GIF格式'}, code=400)
+        ext = file.mimetype.rsplit('/', 1)[1].lower()
+        filename = f"{uuid4().hex}.{ext}"
+        file.save(join(current_app.config['UPLOAD_FOLDER'], filename))
+
+        return make_response({'filename': filename}, code=201)
+    except Exception as e:
+        logger.error(e)
+        return make_response({'err': '服务器错误'}, code=500)
     
 
 @auth_bp.route('/auth/register', methods=['POST'])
@@ -375,26 +396,6 @@ def logout(current_user):
     except Exception as e:
         import traceback
         logger.error(traceback.format_exc())
-        return make_response({'err': '服务器错误'}, code=500)
-
-
-# 针对注册图片的上传
-@auth_bp.route('/upload-img', methods=['POST'])
-def save_img():
-    try:
-        if 'image' not in request.files:
-            return make_response({'err': 'image part not found.'}, code=400)
-        
-        file = request.files['image']
-        if not allowed_img(file.mimetype):
-            return make_response({'err': '仅支持PNG/JPG/JPEG/GIF格式'}, code=400)
-        ext = file.mimetype.rsplit('/', 1)[1].lower()
-        filename = f"{uuid4().hex}.{ext}"
-        file.save(join(current_app.config['UPLOAD_FOLDER'], filename))
-
-        return make_response({'filename': filename}, code=201)
-    except Exception as e:
-        logger.error(e)
         return make_response({'err': '服务器错误'}, code=500)
     
 

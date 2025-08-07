@@ -13,5 +13,12 @@ identified with mysql_native_password by 'Guest123@';
 -- 赋予权限
 grant all privileges on course.* to 'guest'@'%';
 
+-- 针对flask db migrate报错
+use course;
+CREATE TABLE IF NOT EXISTS alembic_version (
+    version_num VARCHAR(32) NOT NULL,
+    PRIMARY KEY (version_num)
+);
+
 -- 刷新
 flush privileges;

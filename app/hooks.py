@@ -25,6 +25,7 @@ def register_hooks(app):
         resp.headers['Access-Control-Allow-Methods'] = 'GET, POST, DELETE, OPTIONS'
         if 'application/json' in resp.headers['Content-Type']:
             resp.headers['Content-Type'] = 'application/json; charset=utf-8'
+
         return resp
     
     @app.before_request

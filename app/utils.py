@@ -5,8 +5,30 @@ from json import dumps
 
 from datetime import datetime, timedelta,timezone
 from loguru import logger
+from threading import Lock
 
 from app.models import User
+
+
+class SafeDict:
+    def __init__(self):
+        self._data = {}
+        self._lock = Lock()
+
+    def set(self, key, value):
+        with self._lock:
+            self._data[key] = value
+
+    def get(self, key):
+        with self._lock:
+            return self._data.get(key)
+        
+    def delete(self, key):
+        with self._lock:
+            if key in self._data:
+                del self._data[key]
+                return True
+            return False
 
 
 # 临时链接用的token操作
@@ -84,5 +106,5 @@ def send_msg(email, msg):
             server.send_message(msg)
         return True
     except Exception as e:
-        logger.error(e)
+        current_app.logger.error(str(e))
         return False

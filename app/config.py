@@ -2,6 +2,7 @@ from dotenv import load_dotenv
 from os import getenv
 from os.path import dirname, join
 from datetime import timedelta
+from urllib.parse import quote
 
 
 load_dotenv()
@@ -17,7 +18,7 @@ class Config:
     JWT_BLACKLIST_ENABLED = True
 
     # 数据库
-    SQLALCHEMY_DATABASE_URI = getenv('DATABASE_URI')
+    SQLALCHEMY_DATABASE_URI = f"mysql+pymysql://{getenv('MYSQL_USER')}:{quote(getenv('MYSQL_PWD'))}@{getenv('MYSQL_HOST')}:{getenv('MYSQL_PORT')}/{getenv('MYSQL_DATABASE')}?charset=utf8mb4&connect_timeout=20"
     SQLALCHEMY_ENGINE_OPTIONS = {
         'pool_size': 10,
         'pool_recycle': 3600,

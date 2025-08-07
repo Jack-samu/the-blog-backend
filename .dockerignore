@@ -10,3 +10,8 @@ Pipfile
 pytest.ini
 report.html
 result.bash
+logs/*
+vendor/flask-monitoring-kit/grafana
+vendor/flask-monitoring-kit/mysql
+vendor/flask-monitoring-kit/prometheus
+vendor/flask-monitoring-kit/README.md

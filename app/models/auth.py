@@ -1,6 +1,5 @@
 from bcrypt import gensalt, hashpw, checkpw
 from uuid import uuid4
-from sqlalchemy import update
 
 from app.extensions import db
 

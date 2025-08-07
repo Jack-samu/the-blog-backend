@@ -1,0 +1,43 @@
+include:
+  - ${PWD}/vendor/flask-monitoring-kit/docker-compose-monitoring.yml
+
+networks:
+  flask-net:
+    name: flask-backend-net
+    driver:  bridge
+    attachable: true
+
+services:
+  mysql_service:
+    image: mysql:8.0
+    container_name: mysql-service
+    networks:
+      - flask-net
+    command: --default-authentication-plugin=mysql_native_password
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PWD}
+    volumes:
+      - $PWD/db/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "${MYSQL_PORT}:3306"
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1", "-u", "root", "-p${MYSQL_ROOT_PWD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 2
+      start_period: 30s
+  
+  flask-backend:
+    build: 
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - $PWD/.env
+    container_name: flask-backend
+    networks:
+      - flask-net
+    depends_on:
+      mysql_service:
+        condition: service_healthy
+    ports:
+      - "8088:8088"

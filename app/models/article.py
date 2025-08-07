@@ -3,7 +3,6 @@ from app.extensions import db
 
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import validates
-from sqlalchemy import func
 
 
 post_tags = db.Table('post_tags',

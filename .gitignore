@@ -16,3 +16,5 @@ result.bash
 .gitsecret
 Dockerfile
 utils_bak
+sock_port.py
+logs
