@@ -64,6 +64,7 @@ jobs:
         MYSQL_PWD: 'Guest123@'
         MYSQL_HOST: 'localhost'
         MYSQL_PORT: 3306
+        MYSQL_DATABASE: 'course'
       run: |
         pytest tests/ \
           --cov=app \
