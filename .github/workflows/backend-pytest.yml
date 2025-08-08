@@ -60,7 +60,10 @@ jobs:
         MAIL_USERNAME: ${{ secrets.MAIL_USERNAME }}
         MAIL_PASSWORD: ${{ secrets.MAIL_PASSWORD }}
         MAIL_PORT: ${{secrets.MAIL_PORT}}
-        DATABASE_URI: mysql+pymysql://guest:Guest123%40@localhost:3306/course?charset=utf8mb4&connect_timeout=20
+        MYSQL_USER: 'guest'
+        MYSQL_PWD: 'Guest123@'
+        MYSQL_HOST: 'localhost'
+        MYSQL_PORT: 3306
       run: |
         pytest tests/ \
           --cov=app \
