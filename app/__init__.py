@@ -51,4 +51,11 @@ def create_app(name='blog-app', config = Config):
     app.register_blueprint(article_bp)
     app.register_blueprint(comment_bp)
 
+    import sys
+    from pathlib import Path
+
+    sys.path.append(str(Path(__file__).parent.parent/"vendor"/"flask-monitoring-kit"))
+    from monitoring import init_metrics
+    init_metrics(app, db)
+
     return app
