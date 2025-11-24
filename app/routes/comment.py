@@ -163,7 +163,6 @@ def create_reply(current_user):
                 comment_id = comment.id,
                 user_id = current_user.id,
                 content = content,
-                post_id = comment.post_id,
                 parent_id = parent_id if parent_id else None
             )
             db.session.add(reply)

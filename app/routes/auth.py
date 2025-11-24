@@ -42,13 +42,10 @@ def send():
     try:
         form = request.get_json()
         username = form.get('username')
-        email = form.get('email')
 
         user = User.query.filter_by(username=username).first()
         if not user:
             return make_response({'err': '用户不存在，检查是否输入错误'}, code=400)
-        if user.email != email:
-            return make_response({'err': '用户邮箱不正确，检查是否为该邮箱'}, code=400)
         # 刚发送还没1分钟，让老子停一下
         msg = verification_codes.get(username)
         if msg and (datetime.now() - msg['sent_at']).total_seconds() < 60:
@@ -60,12 +57,11 @@ def send():
         code = ''.join(choice(chs) for _ in range(6))
         verification_codes.set(username, {
             'code': code,
-            'email': email,
             'sent_at': datetime.now(),
         })
         logger.info(msg)
         msg = MIMEText(f'{username}，你好，你的验证码为：{code}，有效期为3分钟')
-        if send_msg(email, msg):
+        if send_msg(user.email, msg):
             return make_response({'msg': '验证码已发送'}, code=200)
         else:
             return make_response({'err': '验证码发送失败，请重试'}, code=500)
@@ -110,11 +106,10 @@ def verify():
         return make_response({'err':'服务器错误，请重试'}, code=500)
     
 
-@auth_bp.route('/auth/reset/<string:token>/<string:uuid>', methods=['GET', 'POST'])
-def reset(token, uuid):
+@auth_bp.route('/auth/reset/<string:token>', methods=['GET', 'POST'])
+def reset(token):
     # 校验token
     try:
-        UUID(uuid, version=4)
 
         data = decode(token, current_app.config['JWT_SECRET_KEY'], algorithms=['HS256'])
 

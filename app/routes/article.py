@@ -19,6 +19,7 @@ article_bp = Blueprint('article', __name__)
 def articles():
     page = request.args.get('page', 1, type=int)
     perpage = request.args.get('per_page', 10, type=int)
+    # pageSize后续加吧
 
     try:
         # 对已发表post进行分页查询，常见的有joinedload，subqueryload和lazyload
@@ -56,14 +57,14 @@ def get_article(id):
         return make_response({'err': '服务器错误，获取文章详情出错'}, 500)
 
 
-@article_bp.route('/drafts/<int:id>', methods=["GET"])
+@article_bp.route('/articles/draft/<int:id>', methods=["GET"])
 @token_required
 def get_draft(current_user, id):
     try:
         with db.session.begin_nested():
-            post = Draft.query.get(id)
+            draft = Draft.query.get(id)
 
-        return make_response({'article': ArticleSerializer.format_detail(post)}, 200)
+        return make_response({'article': ArticleSerializer.format_detail(draft)}, 200)
     except Exception as e:
         import traceback
         logger.error(traceback.format_exc())
@@ -102,7 +103,7 @@ def get_published_personal(current_user):
         return make_response({'err': '服务器错误，获取用户已发布文章失败'}, 500)
     
 
-@article_bp.route('/articles/draft', methods=['GET'])
+@article_bp.route('/articles/drafts', methods=['GET'])
 @token_required
 def get_drafts_personal(current_user):
     try:
@@ -209,7 +210,7 @@ def save_article(current_user):
     
     
 # 文章删除
-@article_bp.route('/articles/<int:id>', methods=['DELETE'])
+@article_bp.route('/articles/post/<int:id>', methods=['DELETE'])
 @token_required
 def delete_article(current_user, id):
     try:
@@ -235,7 +236,7 @@ def delete_article(current_user, id):
     
 
 # 草稿删除
-@article_bp.route('/drafts/<int:id>', methods=['DELETE'])
+@article_bp.route('/articles/draft/<int:id>', methods=['DELETE'])
 @token_required
 def delete_draft(current_user, id):
     try:
